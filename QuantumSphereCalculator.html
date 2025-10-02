@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Qubit Gate Demo — Two Spheres with Entangling Gates</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    h1 { margin: 0 0 8px; }
+    .layout { display: grid; grid-template-columns: 420px 420px 1fr; gap: 20px; align-items: start; }
+    canvas { border: 1px solid #333; background: #fafafa; }
+    .panel { border: 1px solid #ccc; background: #fff; padding: 12px; }
+    #controls button { margin: 0.25rem 0.4rem 0.25rem 0; padding: 0.5rem 0.9rem; cursor: pointer; }
+    #log { max-height: 260px; overflow-y: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+    .dim { color: #555; }
+    .subtitle { text-align:center; margin-top:6px; }
+    .group-title { font-weight: 700; margin-top: 6px; }
+    .instr { margin:6px 0 12px; padding:10px; border:1px dashed #ddd; background:#fcfcfc; line-height:1.45; }
+    .instr ul { margin: 6px 0 0 18px; }
+    .instr li { margin: 2px 0; }
+    .badge { display:inline-block; min-width:1.25rem; text-align:center; border-radius:4px; padding:0 6px; font-weight:700; border:1px solid #ddd; }
+    .bblue{ background:rgba(0,96,255,.12); color:#0b57d0; border-color:rgba(0,96,255,.35);} 
+    .bred { background:rgba(255,0,0,.12); color:#c31111; border-color:rgba(255,0,0,.35);} 
+    input[type="number"] { width: 6rem; }
+  </style>
+</head>
+<body>
+  <h1>Qubit Gate Demo — Two Spheres</h1>
+  <div class="layout">
+    <div>
+      <canvas id="canvasA" width="400" height="400"></canvas>
+      <div class="subtitle"><strong>Sphere A</strong> — coords: <span id="coordsA"></span></div>
+    </div>
+    <div>
+      <canvas id="canvasB" width="400" height="400"></canvas>
+      <div class="subtitle"><strong>Sphere B</strong> — coords: <span id="coordsB"></span></div>
+    </div>
+    <div class="panel">
+      <div id="controls">
+        <div class="row">
+          <label><input type="radio" name="target" value="A" checked> Target: A</label>
+          <label><input type="radio" name="target" value="B"> Target: B</label>
+          <label><input type="checkbox" id="both"> Apply to both</label>
+        </div>
+        <div class="group-title">Single-qubit gates</div>
+        <div class="row">
+          <button onclick="apply1('X')">X</button>
+          <button onclick="apply1('Y')">Y</button>
+          <button onclick="apply1('Z')">Z</button>
+          <button onclick="apply1('H')">H</button>
+          <button onclick="apply1('S')">S</button>
+          <button onclick="apply1('T')">T</button>
+        </div>
+        <div class="row">
+          <label>Rx(θ°) <input id="degRx" type="number" step="5" value="45"></label>
+          <button onclick="applyRot('Rx')">Apply Rx</button>
+        </div>
+        <div class="row">
+          <label>Ry(θ°) <input id="degRy" type="number" step="5" value="45"></label>
+          <button onclick="applyRot('Ry')">Apply Ry</button>
+        </div>
+        <div class="row">
+          <label>Rz(θ°) <input id="degRz" type="number" step="5" value="45"></label>
+          <button onclick="applyRot('Rz')">Apply Rz</button>
+        </div>
+        <div class="instr" id="singleInstr">
+          <strong>Single-qubit gate instructions</strong>
+          <ul>
+            <li><span class="badge bred">X</span> Pauli-X (NOT): flips |0⟩ ↔ |1⟩; π rotation around X.</li>
+            <li><span class="badge bred">Y</span> Pauli-Y: bit+phase flip; π rotation around Y.</li>
+            <li><span class="badge bred">Z</span> Pauli-Z: adds a − phase to |1⟩; π rotation around Z.</li>
+            <li><span class="badge bblue">H</span> Hadamard: maps basis ⇄ equal superpositions (|0⟩→(|0⟩+|1⟩)/√2, |1⟩→(|0⟩−|1⟩)/√2).</li>
+            <li><span class="badge bblue">S</span> Phase (√Z): +90° phase on |1⟩; quarter-turn around Z.</li>
+            <li><span class="badge bblue">T</span> π/8 gate (√S): +45° phase on |1⟩.</li>
+            <li><span class="badge bblue">Rx/Ry/Rz(θ)</span> Arbitrary rotations by θ degrees about X/Y/Z axes of the Bloch sphere.</li>
+            <li><em>Tip:</em> Use <strong>Target</strong> or <strong>Apply to both</strong> to choose which qubit(s) get the gate.</li>
+          </ul>
+        </div>
+        <div class="group-title">Two-qubit gates</div>
+        <div class="row">
+          <button onclick="apply2('CNOT_AB')">CNOT A→B</button>
+          <button onclick="apply2('CNOT_BA')">CNOT B→A</button>
+          <button onclick="apply2('CZ')">CZ</button>
+          <button onclick="apply2('SWAP')">SWAP</button>
+        </div>
+        <div class="instr" id="twoInstr">
+          <strong>Two-qubit gate instructions</strong>
+          <ul>
+            <li><span class="badge bblue">CNOT A→B</span> Control=A, Target=B. Flips B if A=|1⟩. Creates entanglement from superpositions.</li>
+            <li><span class="badge bblue">CNOT B→A</span> Control=B, Target=A. Flips A if B=|1⟩.</li>
+            <li><span class="badge bblue">CZ</span> Controlled-Z: applies a − phase to |11⟩. Also entangling when controls are in superposition.</li>
+            <li><span class="badge bblue">SWAP</span> Exchanges the full quantum states of A and B.</li>
+            <li><em>Visualization:</em> Each sphere shows the <strong>reduced state</strong> of that qubit (partial trace over the other). When the pair is entangled, each reduced state becomes mixed—points move toward the center.</li>
+            <li><em>Note:</em> CCNOT (Toffoli) needs a third qubit (two controls + one target). I can add a virtual Qubit C (text-only) on request.</li>
+          </ul>
+        </div>
+        <div class="group-title">Measurements</div>
+        <div class="row">
+          <button onclick="measureQubit('A')">Measure A</button>
+          <button onclick="measureQubit('B')">Measure B</button>
+          <button onclick="measureBoth()">Measure both</button>
+        </div>
+        <div class="instr" id="measureInstr">
+          <strong>Measurement instructions</strong>
+          <ul>
+            <li><span class="badge bblue">Measure</span> collapses the chosen qubit(s) in the computational basis using Born probabilities.</li>
+          </ul>
+        </div>
+        <div class="row">
+          <button onclick="resetUI('|00⟩')">Reset |00⟩</button>
+          <button onclick="resetUI('|01⟩')">Reset |01⟩</button>
+          <button onclick="resetUI('|10⟩')">Reset |10⟩</button>
+          <button onclick="resetUI('|11⟩')">Reset |11⟩</button>
+        </div>
+        <p class="dim" style="margin:8px 0 0;">
+          Bloch view (XZ projection). Top half = <strong>|1⟩</strong>; bottom half = <strong>|0⟩</strong>.
+          Each canvas shows that qubit’s reduced state.
+        </p>
+      </div>
+      <div id="log" class="panel" style="margin-top:10px;"><strong>Gate log</strong></div>
+    </div>
+  </div>
+  <script>
+    function C(re=0, im=0){ return {re, im}; }
+    function cAdd(a,b){ return C(a.re+b.re, a.im+b.im); }
+    function cMul(a,b){ return C(a.re*b.re - a.im*b.re, a.re*b.im + a.im*b.re); } // <- NOTE: fix below
+  </script>
+  <script>
+    // Complex helpers (corrected multiply)
+    function C(re=0, im=0){ return {re, im}; }
+    function cAdd(a,b){ return C(a.re+b.re, a.im+b.im); }
+    function cMul(a,b){ return C(a.re*b.re - a.im*b.im, a.re*b.im + a.im*b.re); }
+    function cScale(a,k){ return C(a.re*k, a.im*k); }
+    function cConj(a){ return C(a.re, -a.im); }
+    function cAbs2(a){ return a.re*a.re + a.im*a.im; }
+
+    // Two-qubit pure state |ψ> = [a00,a01,a10,a11]
+    let psi = [C(1,0), C(0,0), C(0,0), C(0,0)];
+
+    function normalizeVec(v){
+      let s = 0; for(const z of v) s += cAbs2(z);
+      s = Math.sqrt(s) || 1;
+      return v.map(z => C(z.re/s, z.im/s));
+    }
+
+    // Single-qubit gates
+    const X = [[C(0,0), C(1,0)], [C(1,0), C(0,0)]];
+    const Y = [[C(0,0), C(0,-1)], [C(0,1), C(0,0)]];
+    const Z = [[C(1,0), C(0,0)], [C(0,0), C(-1,0)]];
+    const H = (()=>{ const s = 1/Math.SQRT2; return [[C(s,0), C(s,0)], [C(s,0), C(-s,0)]]; })();
+    const S = [[C(1,0), C(0,0)], [C(0,0), C(0,1)]];
+    const T = [[C(1,0), C(0,0)], [C(0,0), C(Math.SQRT1_2, Math.SQRT1_2)]];
+
+    function Rx(theta){ const r = theta*Math.PI/180, ct = Math.cos(r/2), st = Math.sin(r/2); return [[C(ct,0), C(0,-st)],[C(0,-st), C(ct,0)]]; }
+    function Ry(theta){ const r = theta*Math.PI/180, ct = Math.cos(r/2), st = Math.sin(r/2); return [[C(ct,0), C(-st,0)],[C(st,0), C(ct,0)]]; }
+    function Rz(theta){ const r = theta*Math.PI/180, ct = Math.cos(r/2), st = Math.sin(r/2); return [[C(ct,-st), C(0,0)],[C(0,0), C(ct,st)]]; }
+
+    // Apply single-qubit gate to |ψ>
+    function applySingleToPsi(target, U){
+      const [a00,a01,a10,a11] = psi;
+      if (target === 'A'){
+        const b00 = cAdd(cMul(U[0][0], a00), cMul(U[0][1], a10));
+        const b01 = cAdd(cMul(U[0][0], a01), cMul(U[0][1], a11));
+        const b10 = cAdd(cMul(U[1][0], a00), cMul(U[1][1], a10));
+        const b11 = cAdd(cMul(U[1][0], a01), cMul(U[1][1], a11));
+        psi = normalizeVec([b00,b01,b10,b11]);
+      } else {
+        const b00 = cAdd(cMul(U[0][0], a00), cMul(U[0][1], a01));
+        const b01 = cAdd(cMul(U[1][0], a00), cMul(U[1][1], a01));
+        const b10 = cAdd(cMul(U[0][0], a10), cMul(U[0][1], a11));
+        const b11 = cAdd(cMul(U[1][0], a10), cMul(U[1][1], a11));
+        psi = normalizeVec([b00,b01,b10,b11]);
+      }
+    }
+
+    // Two-qubit gates
+    function applyCNOT_AtoB(){ let [a00,a01,a10,a11] = psi; [a10, a11] = [a11, a10]; psi = [a00, a01, a10, a11]; }
+    function applyCNOT_BtoA(){ let [a00,a01,a10,a11] = psi; [a01, a11] = [a11, a01]; psi = [a00, a01, a10, a11]; }
+    function applyCZ(){ let [a00,a01,a10,a11] = psi; a11 = cScale(a11, -1); psi = [a00,a01,a10,a11]; }
+    function applySWAP(){ let [a00,a01,a10,a11] = psi; psi = [a00, a10, a01, a11]; }
+
+    // Reduced states
+    function reducedA(){
+      const [a00,a01,a10,a11] = psi;
+      const r00 = C(cAbs2(a00)+cAbs2(a01),0);
+      const r11 = C(cAbs2(a10)+cAbs2(a11),0);
+      const r01 = cAdd( cMul(a00, cConj(a10)), cMul(a01, cConj(a11)) );
+      const r10 = C(r01.re, -r01.im);
+      return [[r00, r01],[r10, r11]];
+    }
+    function reducedB(){
+      const [a00,a01,a10,a11] = psi;
+      const r00 = C(cAbs2(a00)+cAbs2(a10),0);
+      const r11 = C(cAbs2(a01)+cAbs2(a11),0);
+      const r01 = cAdd( cMul(a00, cConj(a01)), cMul(a10, cConj(a11)) );
+      const r10 = C(r01.re, -r01.im);
+      return [[r00, r01],[r10, r11]];
+    }
+
+    // Bloch from ρ
+    function blochFromRho(rho){
+      const a = rho[0][0], b = rho[0][1], d = rho[1][1];
+      const x = 2 * b.re;
+      const y = -2 * b.im;
+      const z = a.re - d.re;
+      return {x,y,z};
+    }
+
+    // Drawing (XZ projection)
+    function drawSphere(canvasId, rho, coordsId){
+      const c = document.getElementById(canvasId);
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0,0,c.width,c.height);
+      const cx = c.width/2, cy = c.height/2, r = 150;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.clip();
+      ctx.fillStyle = 'rgba(0, 96, 255, 0.18)'; ctx.fillRect(cx - r, cy - r, 2*r, r);
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.18)'; ctx.fillRect(cx - r, cy, 2*r, r);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2);
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+      ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.font = '16px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#0b57d0'; ctx.fillText('1', cx, cy - r + 14);
+      ctx.fillStyle = '#c31111'; ctx.fillText('0', cx, cy + r - 14);
+      const b = blochFromRho(rho);
+      const px = cx + r * b.x;
+      const py = cy - r * b.z;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(px, py);
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#333'; ctx.font = '12px Arial'; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(`(x=${b.x.toFixed(2)}, z=${b.z.toFixed(2)})`, px + 8, py - 8);
+      const p0 = rho[0][0].re, p1 = rho[1][1].re;
+      const coordsEl = document.getElementById(coordsId);
+      if (coordsEl) coordsEl.textContent =
+        `x=${b.x.toFixed(3)}, y=${b.y.toFixed(3)}, z=${b.z.toFixed(3)} | P0=${p0.toFixed(2)}, P1=${p1.toFixed(2)}`;
+    }
+
+    function drawAll(){
+      drawSphere('canvasA', reducedA(), 'coordsA');
+      drawSphere('canvasB', reducedB(), 'coordsB');
+    }
+
+    // Logging
+    function log(msg){ const log = document.getElementById('log'); const div = document.createElement('div'); div.textContent = msg; log.prepend(div); }
+    function logState(tag){
+      const rA = reducedA(), rB = reducedB();
+      const p0A = rA[0][0].re.toFixed(2), p1A = rA[1][1].re.toFixed(2);
+      const p0B = rB[0][0].re.toFixed(2), p1B = rB[1][1].re.toFixed(2);
+      log(`${tag} | A:P0=${p0A},P1=${p1A}  B:P0=${p0B},P1=${p1B}`);
+    }
+
+    // UI helpers
+    function selectedTargets(){
+      const both = document.getElementById('both').checked;
+      if (both) return ['A','B'];
+      const radios = document.querySelectorAll('input[name="target"]');
+      for (const r of radios) if (r.checked) return [r.value];
+      return ['A'];
+    }
+
+    // Actions: single-qubit
+    function apply1(name){
+      const U = (name==='X')?X:(name==='Y')?Y:(name==='Z')?Z:(name==='H')?H:(name==='S')?S:(name==='T')?T:null;
+      if (!U) return;
+      const targets = selectedTargets();
+      for (const t of targets) applySingleToPsi(t, U);
+      drawAll();
+      log(`${targets.join('&')}: ${name}`);
+      logState('After '+name);
+    }
+    function applyRot(axis){
+      const deg = parseFloat(document.getElementById(axis==='Rx'?'degRx':axis==='Ry'?'degRy':'degRz').value)||0;
+      const U = axis==='Rx'?Rx(deg):axis==='Ry'?Ry(deg):Rz(deg);
+      const targets = selectedTargets();
+      for (const t of targets) applySingleToPsi(t, U);
+      drawAll();
+      log(`${targets.join('&')}: ${axis}(${deg}°)`);
+      logState('After '+axis);
+    }
+
+    // Actions: two-qubit
+    function apply2(kind){
+      switch(kind){
+        case 'CNOT_AB': applyCNOT_AtoB(); log('CNOT A→B'); break;
+        case 'CNOT_BA': applyCNOT_BtoA(); log('CNOT B→A'); break;
+        case 'CZ':      applyCZ();        log('CZ'); break;
+        case 'SWAP':    applySWAP();      log('SWAP'); break;
+      }
+      psi = normalizeVec(psi);
+      drawAll();
+      logState('After '+kind);
+    }
+
+    // Measurements
+    function measureQubit(q){
+      let [a00,a01,a10,a11] = psi;
+      if (q==='A'){
+        const p0 = cAbs2(a00)+cAbs2(a01);
+        const res = Math.random() < p0 ? 0 : 1;
+        psi = res===0 ? [a00,a01,C(0,0),C(0,0)] : [C(0,0),C(0,0),a10,a11];
+        psi = normalizeVec(psi);
+        drawAll();
+        log(`Measure A → ${res}`);
+        logState('After measure A');
+      } else {
+        const p0 = cAbs2(a00)+cAbs2(a10);
+        const res = Math.random() < p0 ? 0 : 1;
+        psi = res===0 ? [a00,C(0,0),a10,C(0,0)] : [C(0,0),a01,C(0,0),a11];
+        psi = normalizeVec(psi);
+        drawAll();
+        log(`Measure B → ${res}`);
+        logState('After measure B');
+      }
+    }
+    function measureBoth(){
+      const probs = psi.map(cAbs2);
+      let r = Math.random();
+      let cum = 0, idx = 0;
+      for (let i=0;i<4;i++){ cum += probs[i]; if (r < cum){ idx = i; break; } }
+      psi = [C(0,0),C(0,0),C(0,0),C(0,0)];
+      psi[idx] = C(1,0);
+      drawAll();
+      const labels = ['00','01','10','11'];
+      log(`Measure AB → |${labels[idx]}⟩`);
+      logState('After measure AB');
+    }
+
+    // Reset
+    function resetUI(which){
+      if (which==='|00⟩') psi = [C(1,0),C(0,0),C(0,0),C(0,0)];
+      if (which==='|01⟩') psi = [C(0,0),C(1,0),C(0,0),C(0,0)];
+      if (which==='|10⟩') psi = [C(0,0),C(0,0),C(1,0),C(0,0)];
+      if (which==='|11⟩') psi = [C(0,0),C(0,0),C(0,0),C(1,0)];
+      drawAll();
+      log('Reset to '+which);
+      logState('After reset');
+    }
+
+    // First paint
+    drawAll();
+  </script>
+</body>
+</html>
